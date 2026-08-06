@@ -1,0 +1,20 @@
+node_modules
+dist
+shots/
+*.local
+.DS_Store
+.env
+.env.*
+*.env
+
+/venv
+
+# Python bytecode — these were committed once by accident.
+__pycache__/
+*.py[cod]
+
+# Call artifacts are DB-only. Transcripts live in custom_voicebot.transcript_turns
+# (written per turn by db/recorder.py) — never on disk. 113 legacy .txt/.json
+# transcripts from the old bot were removed; this stops them coming back.
+/transcripts/
+*.wav

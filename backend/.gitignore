@@ -1,0 +1,5 @@
+uploads/
+alta.db
+.env
+__pycache__/
+venv/

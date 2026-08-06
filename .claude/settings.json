@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./venv/Scripts/python.exe -c ' *)",
+      "PowerShell(Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Write-Output \"killing PID $\\($_.OwningProcess\\)\"; Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }; Start-Sleep -Seconds 2; $still = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue; if \\($null -eq $still\\) { Write-Output \"port 8000 is free\" } else { Write-Output \"STILL BOUND\" })",
+      "Bash(c:/Users/kunal/Desktop/closet/backend/venv/Scripts/python.exe -c ' *)",
+      "PowerShell(Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }; Start-Sleep -Seconds 2; if \\($null -eq \\(Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue\\)\\) { Write-Output \"port 8000 free\" } else { Write-Output \"still bound\" })",
+      "PowerShell(Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }; Start-Sleep -Seconds 2; if \\($null -eq \\(Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue\\)\\) { \"port 8000 free\" } else { \"still bound\" })",
+      "Bash(./venv/Scripts/python.exe -c \"import app.routers.outfits\")",
+      "Bash(cp /tmp/one.mjs ./one.mjs)",
+      "Bash(node ./one.mjs \"C:/Users/kunal/AppData/Local/Temp/claude/c--Users-kunal-Desktop-closet/7deac17e-49d3-40d6-93a5-c56cfe4bc738/scratchpad\")",
+      "Bash(rm -f ./one.mjs)",
+      "Bash(where ngrok *)",
+      "Bash(ngrok version *)",
+      "Bash(ngrok config *)",
+      "Bash(curl -s -H 'ngrok-skip-browser-warning: 1' -o /dev/null -w 'HTTP %{http_code}\\\\n' https://unsplenetic-delinda-cosmonautically.ngrok-free.dev/)",
+      "Bash(curl -s -H 'ngrok-skip-browser-warning: 1' https://unsplenetic-delinda-cosmonautically.ngrok-free.dev/api/items)",
+      "Bash(./venv/Scripts/python.exe -c \"import app.main\")"
+    ]
+  }
+}
