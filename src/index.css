@@ -26,3 +26,110 @@ body,
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* --------------------------------------------------------------------------
+   Motion
+   Every animation below is wrapped by the reduced-motion guard at the bottom
+   of this file, so honouring the OS setting is not something each component
+   has to remember.
+   -------------------------------------------------------------------------- */
+
+@keyframes alta-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes alta-rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes alta-pop {
+  from { opacity: 0; transform: scale(0.94); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes alta-sheet-up {
+  from { transform: translateY(100%); }
+  to   { transform: none; }
+}
+
+@keyframes alta-slide-left {
+  from { opacity: 0; transform: translateX(24px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes alta-slide-right {
+  from { opacity: 0; transform: translateX(-24px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes alta-shimmer {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+
+@keyframes alta-blink {
+  0%, 60%, 100% { opacity: 0.25; }
+  30%           { opacity: 1; }
+}
+
+.animate-fade-in     { animation: alta-fade-in 220ms ease-out both; }
+.animate-rise        { animation: alta-rise 320ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-pop         { animation: alta-pop 240ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-sheet-up    { animation: alta-sheet-up 300ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-slide-left  { animation: alta-slide-left 280ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-slide-right { animation: alta-slide-right 280ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* Staggers a grid or list so items arrive in sequence instead of all at once. */
+.stagger > * {
+  animation: alta-rise 340ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.stagger > *:nth-child(1)  { animation-delay: 0ms; }
+.stagger > *:nth-child(2)  { animation-delay: 35ms; }
+.stagger > *:nth-child(3)  { animation-delay: 70ms; }
+.stagger > *:nth-child(4)  { animation-delay: 105ms; }
+.stagger > *:nth-child(5)  { animation-delay: 140ms; }
+.stagger > *:nth-child(6)  { animation-delay: 175ms; }
+.stagger > *:nth-child(7)  { animation-delay: 210ms; }
+.stagger > *:nth-child(8)  { animation-delay: 245ms; }
+.stagger > *:nth-child(9)  { animation-delay: 280ms; }
+.stagger > *:nth-child(n + 10) { animation-delay: 315ms; }
+
+/* Loading placeholder for images and cards. */
+.skeleton {
+  background: linear-gradient(90deg, #f4f4f5 25%, #ebebed 37%, #f4f4f5 63%);
+  background-size: 400% 100%;
+  animation: alta-shimmer 1.4s ease-in-out infinite;
+}
+
+/* The three dots while Alta is composing a reply. */
+.typing-dot {
+  animation: alta-blink 1.2s infinite ease-in-out both;
+}
+.typing-dot:nth-child(2) { animation-delay: 0.18s; }
+.typing-dot:nth-child(3) { animation-delay: 0.36s; }
+
+/* Gives every button a little physical feedback without per-component styling. */
+button:not(:disabled),
+a[role="button"] {
+  transition:
+    transform 140ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 140ms ease,
+    background-color 140ms ease,
+    color 140ms ease,
+    border-color 140ms ease;
+}
+button:not(:disabled):active {
+  transform: scale(0.97);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

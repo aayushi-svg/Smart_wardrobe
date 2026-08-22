@@ -1,0 +1,464 @@
+================================================================================
+ ALTA CLOSET - HOW TO RUN & TEST (Windows / VS Code)
+================================================================================
+
+Everything below is meant to be typed into VS Code's integrated terminal
+(Terminal > New Terminal, or Ctrl+`). The default shell on this machine is
+PowerShell, so PowerShell syntax is given first; Git Bash equivalents are noted
+where they differ.
+
+IMPORTANT PowerShell note: PowerShell 5.1 does NOT support "&&" between
+commands. Use one command per line, or separate with ";".
+
+You will need TWO terminals open at the same time:
+   Terminal 1 -> backend  (FastAPI, port 8000)
+   Terminal 2 -> frontend (Vite,    port 5173)
+Split them in VS Code with the "Split Terminal" button (or Ctrl+Shift+5).
+
+
+--------------------------------------------------------------------------------
+0. PREREQUISITES
+--------------------------------------------------------------------------------
+Verified working versions on this machine:
+
+   node -v            ->  v22.17.1     (any Node 20+ is fine)
+   npm -v             ->  10.9.2
+   py -V              ->  Python 3.13.14   (any Python 3.11+ is fine)
+
+Check them:
+
+   node -v
+   npm -v
+   py -V
+
+If "py" is not recognised, try "python -V" and substitute "python" for "py"
+everywhere below.
+
+Project root used in all examples:
+   c:\Users\kunal\Desktop\closet
+
+
+--------------------------------------------------------------------------------
+1. ONE-TIME SETUP
+--------------------------------------------------------------------------------
+
+1.1  Open the project
+--------------------
+   File > Open Folder... > c:\Users\kunal\Desktop\closet
+   Then Ctrl+` to open a terminal. Confirm you are in the right place:
+
+   PowerShell:
+      Get-Location
+
+   Git Bash:
+      pwd
+
+
+1.2  Add the Gemini API key
+---------------------------
+Get a free key at https://aistudio.google.com/apikey
+
+   PowerShell:
+      Copy-Item backend\.env.example backend\.env
+      code backend\.env
+
+   Git Bash:
+      cp backend/.env.example backend/.env
+      code backend/.env
+
+In the file that opens, fill in line 2 so it reads (no quotes, no spaces):
+
+      GEMINI_API_KEY=AIza....your-real-key....
+
+Save with Ctrl+S.
+
+The two commented lines below it are optional model overrides. Leave them
+commented unless you specifically want different models:
+
+      # GEMINI_IMAGE_MODEL=gemini-3.1-flash-image
+      # GEMINI_TEXT_MODEL=gemini-3.6-flash
+
+NOTE: backend\.env is git-ignored, so your key is never committed.
+NOTE: the app still boots without a key - only the AI features
+      (auto-fill, cut-out, avatar render) will fail. Everything else,
+      including the e2e test, works without one.
+
+
+1.3  Create the Python virtual environment + install backend deps
+-----------------------------------------------------------------
+Run these ONE LINE AT A TIME from the project root:
+
+   PowerShell:
+      cd backend
+      py -m venv venv
+      venv\Scripts\python -m pip install --upgrade pip
+      venv\Scripts\python -m pip install -r requirements.txt
+      cd ..
+
+   Git Bash:
+      cd backend
+      py -m venv venv
+      venv/Scripts/python -m pip install --upgrade pip
+      venv/Scripts/python -m pip install -r requirements.txt
+      cd ..
+
+This installs: fastapi, uvicorn, python-multipart, python-dotenv,
+google-genai, pillow.
+
+If "py -m venv venv" says the folder already exists, the venv is already
+there - just run the two pip lines.
+
+You do NOT need to "activate" the venv. Every command below calls
+venv\Scripts\python directly, which is what npm run dev:api does too.
+
+
+1.4  Install frontend deps
+--------------------------
+From the project root:
+
+      npm install
+
+
+1.5  (Only needed for the e2e test) install the Playwright browser
+------------------------------------------------------------------
+      npx playwright install chromium
+
+Skip this if you are not going to run "npm run e2e".
+
+
+--------------------------------------------------------------------------------
+2. RUNNING THE APP - EVERY TIME
+--------------------------------------------------------------------------------
+
+TERMINAL 1 - BACKEND
+--------------------
+From the project root:
+
+      npm run dev:api
+
+That is a shortcut for:
+      cd backend
+      venv\Scripts\python -m uvicorn app.main:app --reload --port 8000
+
+Expected output:
+
+      INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+      INFO:     Started reloader process [...]
+      INFO:     Application startup complete.
+
+Leave this terminal running. --reload means the server restarts by itself
+whenever you edit a Python file.
+
+To run it manually instead (e.g. on a different port):
+
+   PowerShell:
+      cd backend
+      venv\Scripts\python -m uvicorn app.main:app --reload --port 8000
+
+   Git Bash:
+      cd backend
+      venv/Scripts/python -m uvicorn app.main:app --reload --port 8000
+
+
+TERMINAL 2 - FRONTEND
+---------------------
+Split the terminal (Ctrl+Shift+5) so you can see both, then from the project
+root:
+
+      npm run dev
+
+Expected output:
+
+      VITE v8.x  ready in ### ms
+      ->  Local:   http://localhost:5173/
+
+Ctrl+Click that URL to open it in the browser.
+
+Vite proxies /api and /uploads through to http://localhost:8000
+(see vite.config.ts), so the frontend and backend talk to each other with no
+extra configuration and no CORS setup.
+
+TO STOP either server: click into its terminal and press Ctrl+C.
+
+
+--------------------------------------------------------------------------------
+3. VERIFYING IT ACTUALLY WORKS
+--------------------------------------------------------------------------------
+
+3.1  Backend is alive
+---------------------
+Open a THIRD terminal (do not stop the servers) and run:
+
+   PowerShell:
+      Invoke-RestMethod http://localhost:8000/api/health
+
+   Git Bash:
+      curl http://localhost:8000/api/health
+
+Expected:  status = ok       (JSON: {"status":"ok"})
+
+
+3.2  Gemini key was picked up
+-----------------------------
+   PowerShell:
+      Invoke-RestMethod http://localhost:8000/api/health/gemini
+
+   Git Bash:
+      curl http://localhost:8000/api/health/gemini
+
+A healthy response means the key works. This endpoint deliberately does NOT
+spend an image-generation call.
+
+You can also check it in the UI: open the app and go to the Profile page. It
+shows a GREEN banner when Gemini is connected, or an AMBER banner telling you
+exactly what is wrong (missing key, bad key, wrong model name).
+
+If it fails:
+   - confirm backend\.env exists (not just .env.example)
+   - confirm the line is  GEMINI_API_KEY=...  with no quotes and no trailing space
+   - restart Terminal 1 (Ctrl+C, then npm run dev:api) - .env is read at startup
+
+
+3.3  Interactive API docs
+-------------------------
+Open in a browser:
+
+      http://localhost:8000/docs
+
+This is FastAPI's Swagger UI. You can fire every endpoint from here without
+touching the frontend - useful for isolating whether a bug is frontend or
+backend. Endpoints available:
+
+   GET     /api/items                    list closet (?wishlist=true)
+   POST    /api/items                    create item (multipart, repeatable "files")
+   POST    /api/items/analyze            photo -> brand/category/description/colour
+   PATCH   /api/items/{id}               edit
+   DELETE  /api/items/{id}               remove
+   POST    /api/items/{id}/cutout        re-run background removal
+   POST    /api/items/{id}/enrich        backfill details + cutout for one item
+   GET     /api/avatar-references        identity photos (face/front/side/back)
+   POST    /api/avatar-references
+   DELETE  /api/avatar-references
+   GET     /api/outfits/suggestions      looks from your closet (?refresh=true)
+   POST    /api/outfits/{id}/avatar      generate the try-on render
+   GET     /api/calendar                 plan outfits by date
+   PUT     /api/calendar
+   DELETE  /api/calendar
+   GET     /api/health
+   GET     /api/health/gemini
+
+
+3.4  Manual walkthrough of the app  (the real smoke test)
+---------------------------------------------------------
+At http://localhost:5173 :
+
+   1. PROFILE tab
+      - Upload a full-body photo of yourself. The "front" slot is the one used
+        for renders; the "face" slot is a separate close portrait and is the
+        single biggest lever on how recognisable the avatar looks.
+      - Confirm the green "Gemini connected" banner.
+
+   2. "+" (Add item)
+      - Snap or upload a photo of a garment.
+      - Click "Auto-fill details from photo" -> brand, category, description and
+        colour should populate within a few seconds. (This is the text model.)
+      - Click Save. You land back on the closet grid immediately; the cut-out
+        runs in the BACKGROUND, so the tile may show the raw photo for a moment
+        and then swap to the garment on white.
+      - If the cut-out fails, the original photo is kept and a wand button
+        appears on the tile to retry.
+
+   3. CLOSET tab
+      - Your item should be listed.
+      - If some items are missing details or cut-outs, a "Complete with AI"
+        button appears; it backfills them one at a time and then rebuilds the
+        outfit suggestions.
+
+   4. HOME tab
+      - Outfit suggestions built from what you own. "New looks" reshuffles them.
+
+   5. "Create Avatar" on a look
+      - Renders you wearing that outfit (this is the slowest call - allow
+        10-30s). "Regenerate" for another take.
+      - After rendering, the avatar sits inline in the right third of the
+        flat-lay card and the button becomes "View Avatar".
+
+   6. CALENDAR tab
+      - "+" on any day cycles through your saved looks.
+
+What "working" looks like at each stage, in one line:
+      key OK -> auto-fill populates -> cut-out lands on white -> avatar renders
+      your face -> calendar keeps the look.
+
+
+--------------------------------------------------------------------------------
+4. AUTOMATED END-TO-END TEST
+--------------------------------------------------------------------------------
+The e2e script drives a real Chromium browser: it uploads an item through the
+actual form and then walks every screen, capturing a screenshot per step and
+failing on any browser console error.
+
+It does NOT need a Gemini key - the script explicitly skips the AI cut-out
+checkbox so it runs on a bare setup.
+
+PREREQUISITES for the e2e run:
+   (a) both servers running (sections 2 above)
+   (b) chromium installed:      npx playwright install chromium
+   (c) a ./shots folder containing a fixture image named  tee.png
+
+Create the shots folder and drop in any PNG named tee.png:
+
+   PowerShell:
+      New-Item -ItemType Directory shots
+      # then copy any png into it and rename it tee.png, e.g.
+      Copy-Item public\favicon.svg shots\ -WhatIf   # (svg won't work - use a real .png)
+
+   Git Bash:
+      mkdir -p shots
+      # copy any .png you have into shots/tee.png
+
+Any real PNG of a t-shirt works. The folder is git-ignored.
+
+RUN IT (third terminal, servers still up):
+
+      npm run e2e
+
+IMPORTANT - PORT MISMATCH: the script defaults to BASE_URL
+http://localhost:5175, but "npm run dev" serves on 5173. Point it at the right
+port explicitly:
+
+   PowerShell:
+      $env:BASE_URL = "http://localhost:5173"
+      npm run e2e
+
+   Git Bash:
+      BASE_URL=http://localhost:5173 npm run e2e
+
+Expected output:
+
+        ok  home
+        ok  closet
+        ok  add-item-form
+        ok  after-save
+        ok  profile
+        ok  calendar
+        ok  avatar-modal
+
+      upload round-trip: OK
+      no console errors
+
+Exit code 0 = pass. The script exits 1 if the upload did not round-trip or if
+any console error was captured.
+
+Screenshots land in .\shots\ as e2e-home.png, e2e-closet.png, and so on. Open
+them in VS Code to see exactly what the browser saw at each step.
+
+The test leaves a real item behind in the database with brand "E2E Brand" -
+delete it from the Closet page afterwards if it gets in your way.
+
+
+--------------------------------------------------------------------------------
+5. OTHER USEFUL COMMANDS
+--------------------------------------------------------------------------------
+
+   npm run lint       Lint the frontend with oxlint.
+   npm run build      Type-check (tsc -b) and produce a production build in dist/.
+                      Good pre-commit gate: it fails on any TypeScript error.
+   npm run preview    Serve the built dist/ locally to sanity-check the build.
+                      The API proxy does NOT apply here - the backend must be
+                      reachable another way.
+
+Backend without the npm shortcut:
+
+      backend\venv\Scripts\python -m uvicorn app.main:app --reload --port 8000
+
+Reinstall backend deps after a requirements.txt change:
+
+      backend\venv\Scripts\python -m pip install -r backend\requirements.txt
+
+
+--------------------------------------------------------------------------------
+6. WHERE THE DATA LIVES  (how to reset)
+--------------------------------------------------------------------------------
+   backend\alta.db        SQLite database - items, outfits, calendar, avatar refs
+   backend\uploads\       every uploaded and generated image
+
+Both are local files with no external accounts involved.
+
+TO START COMPLETELY FRESH (this permanently deletes all items and renders -
+make sure that is what you want):
+
+   1. Stop the backend (Ctrl+C in Terminal 1).
+   2. PowerShell:
+         Remove-Item backend\alta.db
+         Remove-Item backend\uploads\* -Recurse
+      Git Bash:
+         rm backend/alta.db
+         rm -rf backend/uploads/*
+   3. Start it again: npm run dev:api
+      The schema is recreated automatically on startup (init_db in app/main.py).
+
+Note the app is single-tenant: every row carries a user_id fixed to
+DEMO_USER_ID ("demo-user") in backend/app/config.py.
+
+
+--------------------------------------------------------------------------------
+7. TROUBLESHOOTING
+--------------------------------------------------------------------------------
+
+"The token '&&' is not a valid statement separator"
+   You are in PowerShell. Run the commands on separate lines, or join with ";".
+
+"py: command not found" / "'py' is not recognized"
+   Use "python" instead, or install Python from python.org with the
+   "Add to PATH" box ticked. Restart VS Code afterwards so the terminal picks
+   up the new PATH.
+
+"cannot be loaded because running scripts is disabled on this system"
+   PowerShell execution policy. Either use the Git Bash terminal instead, or:
+      Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+
+"ModuleNotFoundError: No module named 'fastapi'"
+   The venv deps are not installed, or you are running the system Python.
+   Re-run step 1.3 and make sure the command starts with venv\Scripts\python.
+
+Port 8000 already in use
+   Find and kill the old server:
+      PowerShell:
+         Get-NetTCPConnection -LocalPort 8000 | Select-Object OwningProcess
+         Stop-Process -Id <that-id>
+   Or run on another port - but then also update the two proxy targets in
+   vite.config.ts.
+
+Port 5173 already in use
+   Vite will pick 5174, 5175, ... automatically and print the real URL. Use
+   whatever it prints, and pass the same URL as BASE_URL to the e2e test.
+
+Frontend loads but every API call 404s or the network tab shows failures
+   The backend is not running, or it is not on port 8000. Check Terminal 1 and
+   hit http://localhost:8000/api/health.
+
+Profile shows the amber banner
+   See 3.2. Nine times out of ten it is a missing backend\.env or a server that
+   was not restarted after the key was added.
+
+Avatar render is slow or times out
+   Expected - image generation takes 10-30s. Only worry past ~60s. Watch
+   Terminal 1 for the actual error from the Gemini call.
+
+Avatar face drifts between renders
+   Known and expected: the image model has no seed parameter, so renders are
+   never byte-identical. Adding a sharp close-up to the "face" slot on the
+   Profile page is by far the highest-leverage fix.
+
+Item images look like they have a white box around them
+   They shouldn't - cut-outs come back on solid white and are rendered with
+   mix-blend-mode: multiply so the white drops out. If you see a box, the
+   cut-out probably failed and the raw photo is being shown; retry with the
+   wand button on the tile.
+
+An item is stuck "generating"
+   A killed backend process can leave rows in that state. They are reset
+   automatically on the next startup - just restart Terminal 1.
+
+================================================================================

@@ -1,16 +1,14 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { Sun, Sparkles, ArrowRight, Loader2, RefreshCw } from "lucide-react";
-import type { CalendarEntry, Outfit } from "../types";
+import { Link, useNavigate } from "react-router-dom";
+import { ArrowRight, Loader2, RefreshCw, Sparkles, Sun } from "lucide-react";
+import type { CalendarEntry, CalendarSettings, Outfit } from "../types";
 import { api } from "../api";
+import { useAuth } from "../auth";
 import { useCloset } from "../store";
 import TopBar from "../components/TopBar";
 import DayStrip from "../components/DayStrip";
 import OutfitSection from "../components/OutfitSection";
 import AvatarModal from "../components/AvatarModal";
-
-// No profile name yet — the greeting drops the name until there is one.
-const USER_NAME = "";
 
 function greeting(d: Date) {
   const h = d.getHours();
@@ -20,15 +18,27 @@ function greeting(d: Date) {
 }
 
 export default function Home() {
-  const { items, outfits, loading, error, refreshSuggestions } = useCloset();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { items, outfits, allOutfits, loading, error, refreshSuggestions } = useCloset();
+
   const [selected, setSelected] = useState(new Date());
   const [avatarFor, setAvatarFor] = useState<Outfit | null>(null);
   const [entries, setEntries] = useState<CalendarEntry[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [ask, setAsk] = useState("");
+  const [showWeather, setShowWeather] = useState(true);
 
   useEffect(() => {
     api.calendar().then(setEntries).catch(() => setEntries([]));
   }, [outfits]);
+
+  useEffect(() => {
+    api
+      .calendarSettings()
+      .then((s: CalendarSettings) => setShowWeather(s.showWeather))
+      .catch(() => setShowWeather(true));
+  }, []);
 
   const refresh = async () => {
     setRefreshing(true);
@@ -39,36 +49,46 @@ export default function Home() {
     }
   };
 
+  const firstName = (user?.displayName || "").trim().split(" ")[0];
+
   return (
     <div className="mx-auto w-full max-w-[1080px] px-5 pb-28">
       <TopBar />
-      <DayStrip selected={selected} onSelect={setSelected} entries={entries} outfits={outfits} />
+      <DayStrip selected={selected} onSelect={setSelected} entries={entries} outfits={allOutfits} />
 
       <div className="flex items-start justify-between pt-5">
         <h1 className="text-[19px] text-neutral-900">
           {greeting(new Date())}
-          {USER_NAME && `, ${USER_NAME}`}
+          {firstName && `, ${firstName}`}
         </h1>
-        <div className="flex items-center gap-2 text-neutral-500">
-          <Sun size={17} strokeWidth={1.6} />
-          <span className="text-[15px] text-neutral-800">33°</span>
-          <span className="text-[11px] text-neutral-400">H:38° L:20°</span>
-        </div>
+        {showWeather && (
+          <div className="flex items-center gap-2 text-neutral-500">
+            <Sun size={17} strokeWidth={1.6} />
+            <span className="text-[15px] text-neutral-800">33°</span>
+            <span className="text-[11px] text-neutral-400">H:38° L:20°</span>
+          </div>
+        )}
       </div>
 
       <form
-        onSubmit={(e) => e.preventDefault()}
-        className="mt-5 flex items-center gap-2 rounded-full border border-neutral-200 bg-white px-4 py-2.5"
+        onSubmit={(e) => {
+          e.preventDefault();
+          // The chat page owns the conversation; hand the question straight over.
+          navigate("/chat", { state: { prompt: ask.trim() } });
+        }}
+        className="mt-5 flex items-center gap-2 rounded-full border border-neutral-200 bg-white px-4 py-2.5 focus-within:border-neutral-900"
       >
         <Sparkles size={15} strokeWidth={1.6} className="shrink-0 text-neutral-400" />
         <input
+          value={ask}
+          onChange={(e) => setAsk(e.target.value)}
           className="flex-1 bg-transparent text-[13px] text-neutral-800 placeholder:text-neutral-400 focus:outline-none"
-          placeholder="Ask Alta what to wear to school"
+          placeholder="Ask Closei what to wear to school"
         />
         <button
           type="submit"
-          aria-label="Ask Alta"
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-neutral-900 text-white transition hover:bg-neutral-800"
+          aria-label="Ask Closei"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-neutral-900 text-white hover:bg-neutral-800"
         >
           <ArrowRight size={14} strokeWidth={2} />
         </button>
@@ -81,10 +101,10 @@ export default function Home() {
           <Loader2 size={22} className="animate-spin" />
         </div>
       ) : items.length === 0 ? (
-        <div className="pt-16 text-center">
+        <div className="animate-rise pt-16 text-center">
           <p className="text-[14px] text-neutral-700">Your closet is empty.</p>
           <p className="pt-1 text-[13px] text-neutral-400">
-            Add a few pieces and Alta will start building looks from them.
+            Add a few pieces and Closei will start building looks from them.
           </p>
           <Link
             to="/closet/add"

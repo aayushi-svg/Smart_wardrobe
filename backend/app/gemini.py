@@ -28,6 +28,40 @@ class GeminiNotConfigured(RuntimeError):
     pass
 
 
+# Gemini's image models refuse to generate or edit pictures of real,
+# identifiable people — photos of public figures are refused hardest. The API
+# reports this as a 400 with a block_reason rather than a distinct error type,
+# so the reason has to be read out of the message text.
+BLOCK_MARKERS = (
+    "block_reason",
+    "prohibited_content",
+    "blocked",
+    "safety",
+    "policy",
+)
+
+BLOCKED_MESSAGE = (
+    "Gemini refused this image on policy grounds. Its image models will not "
+    "generate or edit pictures of real, identifiable people, and photos of "
+    "public figures are always rejected. Use a photo of the garment itself — "
+    "laid flat, on a hanger, or a shop product shot. Photos of people belong "
+    "under Profile → Body refs, which is the one place they are expected."
+)
+
+
+def explain(exc: Exception) -> str:
+    """A message worth showing a user, instead of raw provider JSON."""
+    text = str(exc)
+    lowered = text.lower()
+    if any(marker in lowered for marker in BLOCK_MARKERS):
+        return BLOCKED_MESSAGE
+    if "resource_exhausted" in lowered or "429" in text or "quota" in lowered:
+        return "Gemini is rate-limited or out of quota right now. Try again shortly."
+    if "deadline" in lowered or "timeout" in lowered:
+        return "Gemini took too long to respond. Try again."
+    return text
+
+
 @lru_cache(maxsize=1)
 def _cached_client() -> genai.Client:
     return genai.Client(api_key=GEMINI_API_KEY)
@@ -218,6 +252,104 @@ studio background, soft even lighting. No text, watermark or logo overlay."""
         response_format={"type": "image", "aspect_ratio": "3:4", "image_size": "2K"},
     )
     return _output_image(interaction)
+
+
+# --------------------------------------------------------------------------
+# 4. Stylist chat
+# --------------------------------------------------------------------------
+
+CHAT_SYSTEM = """You are Closei, a warm, decisive personal stylist inside a closet app.
+
+You can see the user's profile and their full wardrobe, listed below. Ground every
+suggestion in items they actually own, and name them the way the list does so they can
+find them. If a look needs something they do not own, say so plainly and describe the
+gap in one line rather than pretending it is in the closet.
+
+Style of reply: conversational and short. Two or three sentences for a simple question.
+For an outfit, give the pieces as a short list, then one sentence on why it works.
+No markdown headers, no preamble, no "As an AI". Never invent items, brands or colours
+that are not in the wardrobe list."""
+
+
+def _wardrobe_brief(profile: dict[str, Any], items: list[dict[str, Any]]) -> str:
+    """Compact, token-cheap context block appended to the system instruction."""
+    lines = ["USER"]
+    for label, key in (
+        ("Name", "display_name"), ("Gender", "gender"), ("Body type", "body_type"),
+        ("City", "city"), ("Height", "height_cm"),
+    ):
+        value = profile.get(key)
+        if value:
+            lines.append(f"- {label}: {value}{'cm' if key == 'height_cm' else ''}")
+    if profile.get("style_tags"):
+        lines.append(f"- Style they like: {', '.join(profile['style_tags'])}")
+    if profile.get("sizes"):
+        sizes = ", ".join(f"{k} {v}" for k, v in profile["sizes"].items())
+        lines.append(f"- Sizes: {sizes}")
+
+    lines.append("")
+    lines.append(f"WARDROBE ({len(items)} items)" if items else "WARDROBE (empty)")
+    for item in items:
+        label = " ".join(x for x in [item.get("brand"), item.get("description")] if x)
+        flag = " [wishlist, not owned yet]" if item.get("is_wishlist") else ""
+        lines.append(f"- {item['category']}: {label or 'unlabelled'} ({item['color']}){flag}")
+    return "\n".join(lines)
+
+
+def chat_stream(
+    profile: dict[str, Any],
+    items: list[dict[str, Any]],
+    history: list[dict[str, str]],
+    message: str,
+):
+    """Yields reply text chunks. `history` is [{'role': 'user'|'assistant', 'content': ...}]."""
+    contents = [
+        types.Content(
+            role="model" if turn["role"] == "assistant" else "user",
+            parts=[types.Part.from_text(text=turn["content"])],
+        )
+        for turn in history
+    ]
+    contents.append(types.Content(role="user", parts=[types.Part.from_text(text=message)]))
+
+    stream = _client().models.generate_content_stream(
+        model=TEXT_MODEL,
+        contents=contents,
+        config=types.GenerateContentConfig(
+            system_instruction=f"{CHAT_SYSTEM}\n\n{_wardrobe_brief(profile, items)}",
+            temperature=0.8,
+            max_output_tokens=900,
+        ),
+    )
+    for chunk in stream:
+        if chunk.text:
+            yield chunk.text
+
+
+def title_for(message: str) -> str:
+    """Names a new thread. Falls back to a trimmed first message on any failure,
+    so a thread is never left with a blank title."""
+    fallback = message.strip().split("\n")[0][:48] or "New chat"
+    try:
+        response = _client().models.generate_content(
+            model=TEXT_MODEL,
+            contents=(
+                "Write a 2-4 word title for a chat that starts with this message. "
+                f"Reply with the title only, no quotes.\n\n{message[:400]}"
+            ),
+            config=types.GenerateContentConfig(
+                temperature=0.3,
+                max_output_tokens=64,
+                # Naming a thread needs no reasoning, and at the default level
+                # thinking eats the whole output allowance and returns "".
+                # This model rejects thinking_budget=0 outright — the Gemini 3
+                # family takes thinking_level instead.
+                thinking_config=types.ThinkingConfig(thinking_level="minimal"),
+            ),
+        )
+        return (response.text or "").strip().strip('"')[:60] or fallback
+    except Exception:
+        return fallback
 
 
 def health() -> dict[str, Any]:

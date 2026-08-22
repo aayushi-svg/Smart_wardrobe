@@ -3,4 +3,8 @@ uvicorn[standard]==0.34.0
 python-multipart==0.0.20
 python-dotenv==1.0.1
 google-genai
+google-auth
 pillow==11.1.0
+psycopg[binary,pool]==3.3.4
+pyjwt==2.13.0
+email-validator==2.3.0
